@@ -4,6 +4,7 @@ import sys
 import tornado.web
 import tornado.ioloop
 import tornado.httpserver
+import openai
 
 from service.handler_updateChat import Handler_updateChat
 
@@ -15,6 +16,11 @@ if __name__ == "__main__":
     print('waiting requesting ...')
     print('')
 
+    models = openai.Model.list()
+    print('all available models:')
+    for model in models.data:
+        print(model)
+    print('')
 
     print('\nservice is starting\n')
 
@@ -22,7 +28,7 @@ if __name__ == "__main__":
         (r"/upload", Handler_updateChat),
     ])
     http_server = tornado.httpserver.HTTPServer(application)
-    http_server.listen(13130)
+    http_server.listen(13131)
     tornado.ioloop.IOLoop.instance().start()
 
 

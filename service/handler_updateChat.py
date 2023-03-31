@@ -2,10 +2,13 @@ import base64
 import json
 import logging
 import sys
-from io import BytesIO
+import openai
 
 import tornado.gen
 import tornado.web
+
+from utils.responseHelper import ResponseHelper
+from utils.utilsFile import UtilsFile
 
 
 class Handler_updateChat(tornado.web.RequestHandler):
@@ -26,18 +29,17 @@ class Handler_updateChat(tornado.web.RequestHandler):
         try:
             body = self.request.body
             content = json.loads(body)
-            image64 = content['image64']
+            asks = content['asks']
+            answers = content['answers']
+            new_chat = content['new_chat']
+            role = content['role']
 
-            bytes_image = base64.standard_b64decode(image64)
-            hash = UtilsHash.calc_data_md5(bytes_image)
-
-            filename = './temp/{}.png'.format(hash)
-            UtilsFile.writeFileBinary(filename, bytes_image)
-
-            url = self.upload(filename, hash)
+            answer, history_prompts, history_answers = self.chat(asks, answers, new_chat, role)
 
             response = ResponseHelper.generateResponse(True)
-            response['storage_url'] = url
+            response['answer'] = answer
+            response['asks'] = asks
+            response['answers'] = answers
 
             self.write(json.dumps(response))
             self.finish()
@@ -61,58 +63,73 @@ class Handler_updateChat(tornado.web.RequestHandler):
         content = UtilsFile.readFileContent(filename)
         content = json.loads(content)
 
-        Handler_updateChat.secret_id = content['secret_id']
-        Handler_updateChat.secret_key = content['secret_key']
-        Handler_updateChat.region = content['region']
-        Handler_updateChat.Bucket = content['Bucket']
+        Handler_updateChat.api_key = content['api_key']
         Handler_updateChat.initialized = True
 
 
-    def upload(self, filename, md5):
+    def chat2gpt(self, prompt, assistants, max_tokens=1024, n=1, temperature=0.5, stop=None,
+             model="gpt-3.5-turbo"):
+        messages = []
+        for assistant in assistants:
+            messages.append({
+                "role": 'assistant',
+                "content": assistant,
+            })
+        messages.append({
+            "role": 'user',
+            "content": prompt,
+        })
+        completion = openai.ChatCompletion.create(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens,
+            n=n,
+            stop=stop,
+            temperature=temperature,
+        )
+        return completion.choices[0].message.content
+
+
+    def get_assistant_limit(self):
+        assistant_limit = '''
+        回答不要超过 512 个字和标点
+        '''
+        return assistant_limit
+
+
+    def get_assistant_role(self, role_define):
+        relationship = role_define['relationship']
+        family = role_define['family']
+        character = role_define['character']
+
+        assistant_role = '''
+        你扮演我的{}，
+        咱们家里面的状况是：{}
+        你的性格是：{}
+        '''.format(relationship, family, character)
+        return assistant_role
+
+
+    def chat(self, history_prompts, history_answers, cur_prompt, role_define):
         self.loadConfig()
         if not Handler_updateChat.initialized:
             return ''
 
-        # 正常情况日志级别使用 INFO，需要定位时可以修改为 DEBUG，此时 SDK 会打印和服务端的通信信息
-        logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+        assistant_limit = self.get_assistant_limit()
+        assistant_role = self.get_assistant_role(role_define)
 
-        # 1. 设置用户属性, 包括 secret_id, secret_key, region等。Appid 已在 CosConfig 中移除，请在参数 Bucket 中带上 Appid。Bucket 由 BucketName-Appid 组成
-        secret_id = Handler_updateChat.secret_id  # 用户的 SecretId，建议使用子账号密钥，授权遵循最小权限指引，降低使用风险。子账号密钥获取可参见 https://cloud.tencent.com/document/product/598/37140
-        secret_key = Handler_updateChat.secret_key  # 用户的 SecretKey，建议使用子账号密钥，授权遵循最小权限指引，降低使用风险。子账号密钥获取可参见 https://cloud.tencent.com/document/product/598/37140
-        region = Handler_updateChat.region  # 替换为用户的 region，已创建桶归属的 region 可以在控制台查看，https://console.cloud.tencent.com/cos5/bucket
-        # COS 支持的所有 region 列表参见 https://cloud.tencent.com/document/product/436/6224
-        token = None  # 如果使用永久密钥不需要填入 token，如果使用临时密钥需要填入，临时密钥生成和使用指引参见 https://cloud.tencent.com/document/product/436/14048
-        scheme = 'https'  # 指定使用 http/https 协议来访问 COS，默认为 https，可不填
+        # consist history prompt
+        prompt = ""
+        _history_prompts = history_prompts[-2:]
+        _history_answers = history_answers[-2:]
+        for i in range(len(_history_prompts)):
+            prompt += 'ask:\n' + _history_prompts[i] + '\n'
+            prompt += 'answer:\n' + _history_answers[i] + '\n'
+        prompt += cur_prompt
 
-        config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key, Token=token, Scheme=scheme)
-        client = CosS3Client(config)
+        answer = self.chat2gpt(prompt, [assistant_limit, assistant_role])
+        history_prompts.append(cur_prompt)
+        history_answers.append(answer)
 
-
-        #### 文件流简单上传（不支持超过5G的文件，推荐使用下方高级上传接口）
-        # 强烈建议您以二进制模式(binary mode)打开文件,否则可能会导致错误
-        # filename = 'face.png'
-
-        # md5 = UtilsHash.calc_file_md5(filename)
-
-        if md5:
-            key = 'img_' + md5 + '.png'
-
-            with open(filename, 'rb') as fp:
-                response = client.put_object(
-                    Bucket=Handler_updateChat.Bucket,
-                    Body=fp,
-                    Key=key,
-                    StorageClass='STANDARD',
-                    EnableMD5=False,
-                )
-            # print(response)
-            print(response['ETag'])
-
-            url = 'https://{}.cos.ap-beijing.myqcloud.com/{}.png'.format(self.Bucket, key)
-            print(url)
-            return url
-
-
-
-
+        return answer, history_prompts, history_answers
 
