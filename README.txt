@@ -22,8 +22,8 @@ body
     "new_chat": new chat message
     "role":
     {
-        "relationship": 父亲 \ 母亲 \ 哥哥 \ 弟弟 \ 姐姐 \ 妹妹等，表示和user的关系
-        "family": 描述家庭状况，有什么成员，相互关系等
+        "role": 父亲 \ 母亲 \ 哥哥 \ 弟弟 \ 姐姐 \ 妹妹等，表示和user的关系
+        "background": 描述家庭状况，有什么成员，相互关系等
         "character": 描述数字人性格特点
     }
 }

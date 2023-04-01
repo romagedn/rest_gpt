@@ -12,8 +12,6 @@ from utils.utilsFile import UtilsFile
 
 
 class Handler_updateChat(tornado.web.RequestHandler):
-    initialized = False
-
 
     @tornado.gen.coroutine
     def get(self):
@@ -32,9 +30,9 @@ class Handler_updateChat(tornado.web.RequestHandler):
             asks = content['asks']
             answers = content['answers']
             new_chat = content['new_chat']
-            role = content['role']
+            scenario = content['scenario']
 
-            answer, history_prompts, history_answers = self.chat(asks, answers, new_chat, role)
+            answer, history_prompts, history_answers = self.chat(asks, answers, new_chat, scenario)
 
             response = ResponseHelper.generateResponse(True)
             response['answer'] = answer
@@ -54,20 +52,7 @@ class Handler_updateChat(tornado.web.RequestHandler):
             self.finish()
 
 
-    def loadConfig(self):
-        if Handler_updateChat.initialized:
-            return
-
-        filename = './config.txt'
-
-        content = UtilsFile.readFileContent(filename)
-        content = json.loads(content)
-
-        Handler_updateChat.api_key = content['api_key']
-        Handler_updateChat.initialized = True
-
-
-    def chat2gpt(self, prompt, assistants, max_tokens=1024, n=1, temperature=0.5, stop=None,
+    def chat2gpt(self, prompt, assistants, max_tokens=1024, n=1, temperature=0.8, stop=None,
              model="gpt-3.5-turbo"):
         messages = []
         for assistant in assistants:
@@ -92,42 +77,29 @@ class Handler_updateChat(tornado.web.RequestHandler):
 
     def get_assistant_limit(self):
         assistant_limit = '''
-        回答不要超过 512 个字和标点
+        回答不要超过 512 个字和标点，
+        回复要自然，像真正的聊天一样
         '''
         return assistant_limit
 
 
-    def get_assistant_role(self, role_define):
-        relationship = role_define['relationship']
-        family = role_define['family']
-        character = role_define['character']
-
-        assistant_role = '''
-        你扮演我的{}，
-        咱们家里面的状况是：{}
-        你的性格是：{}
-        '''.format(relationship, family, character)
-        return assistant_role
-
-
-    def chat(self, history_prompts, history_answers, cur_prompt, role_define):
-        self.loadConfig()
-        if not Handler_updateChat.initialized:
-            return ''
+    def chat(self, history_prompts, history_answers, cur_prompt, scenario):
 
         assistant_limit = self.get_assistant_limit()
-        assistant_role = self.get_assistant_role(role_define)
+        assistant_role = scenario['role']
+        assistant_background = scenario['background']
+        assistant_character = scenario['character']
 
         # consist history prompt
         prompt = ""
         _history_prompts = history_prompts[-2:]
         _history_answers = history_answers[-2:]
         for i in range(len(_history_prompts)):
-            prompt += 'ask:\n' + _history_prompts[i] + '\n'
-            prompt += 'answer:\n' + _history_answers[i] + '\n'
+            prompt += _history_prompts[i] + '\n'
+            prompt += _history_answers[i] + '\n'
         prompt += cur_prompt
 
-        answer = self.chat2gpt(prompt, [assistant_limit, assistant_role])
+        answer = self.chat2gpt(prompt, [assistant_limit, assistant_role, assistant_background, assistant_character])
         history_prompts.append(cur_prompt)
         history_answers.append(answer)
 
