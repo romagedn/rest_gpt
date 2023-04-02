@@ -8,7 +8,7 @@ pip install -r requirements.tzt
 ./config.txt
 
 {
-	"api_key": "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",
+	"api_key": "",
 }
 
 
