@@ -20,12 +20,7 @@ body
     "asks": list of history ask
     "answers": list of history answer
     "new_chat": new chat message
-    "role":
-    {
-        "role": 父亲 \ 母亲 \ 哥哥 \ 弟弟 \ 姐姐 \ 妹妹等，表示和user的关系
-        "background": 描述家庭状况，有什么成员，相互关系等
-        "character": 描述数字人性格特点
-    }
+    "scenario": 描述角色关系，性格，家庭状况，背景等
 }
 
 

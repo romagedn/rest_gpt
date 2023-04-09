@@ -22,17 +22,15 @@ history_answers = []
 
 for c in range(len(conversations)):
     cur_prompt = conversations[c]
-    print('ask:\n', cur_prompt, '\n')
+    print('user:\n', cur_prompt, '\n')
 
     data = json.dumps({
         'asks': history_prompts,
         'answers': history_answers,
         'new_chat': cur_prompt,
-        'scenario': {
-            'role': '扮演我的爸爸，和妈妈住在一起，已经都退休了',
-            'background': '我还在上学，住在学校。哥哥已经工作了，在外面租房子住。我好久没回家了，一直在学校忙学习，哥哥最近出差，要下个月才回来。我给你打去电话，接到我的电话，你也很兴奋',
-            'character': '你的性格要表现的沉稳，关心家人'
-        }
+        'scenario': '''
+        扮演我的爸爸，性格沉稳，关心家人。和妈妈住在一起，已经都退休了。我还在上学，住在学校。哥哥已经工作了，在外面租房子住。我好久没回家了，一直在学校忙学习.
+        '''
     })
 
     header = {

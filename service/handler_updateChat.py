@@ -52,18 +52,36 @@ class Handler_updateChat(tornado.web.RequestHandler):
             self.finish()
 
 
-    def chat2gpt(self, prompt, assistants, max_tokens=1024, n=1, temperature=0.8, stop=None,
-             model="gpt-3.5-turbo"):
+    def chat2gpt(self, cur_prompt, system, history_prompts, history_answers,
+                 max_tokens=1024, n=1, temperature=0.8, stop=None,
+                 model="gpt-3.5-turbo"):
         messages = []
-        for assistant in assistants:
-            messages.append({
-                "role": 'assistant',
-                "content": assistant,
-            })
+
+        messages.append({
+            "role": 'system',
+            "content": system,
+        })
+
+        round = min(len(history_prompts), len(history_answers))
+        start = max(0, round - 3)
+        for r in range(start, round):
+            if r < len(history_prompts):
+                messages.append({
+                    "role": 'user',
+                    "content": history_prompts[r],
+                })
+
+            if r < len(history_answers):
+                messages.append({
+                    "role": 'assistant',
+                    "content": history_answers[r],
+                })
+
         messages.append({
             "role": 'user',
-            "content": prompt,
+            "content": cur_prompt,
         })
+
         completion = openai.ChatCompletion.create(
             model=model,
             messages=messages,
@@ -75,22 +93,13 @@ class Handler_updateChat(tornado.web.RequestHandler):
         return completion.choices[0].message.content
 
 
-    def get_assistant_limit(self):
-        assistant_limit = '''
-        回答不要超过 512 个字和标点，
-        回复要自然，像真正的聊天一样
-        '''
-        return assistant_limit
-
-
     def chat(self, history_prompts, history_answers, cur_prompt, scenario):
 
-        assistant_limit = self.get_assistant_limit()
-        assistant_role = scenario['role']
-        assistant_background = scenario['background']
-        assistant_character = scenario['character']
+        system_limit = self.get_system_limit()
+        system = '\n'.join([system_limit, scenario])
 
         # consist history prompt
+        '''
         prompt = ""
         _history_prompts = history_prompts[-2:]
         _history_answers = history_answers[-2:]
@@ -98,10 +107,20 @@ class Handler_updateChat(tornado.web.RequestHandler):
             prompt += _history_prompts[i] + '\n'
             prompt += _history_answers[i] + '\n'
         prompt += cur_prompt
+        '''
 
-        answer = self.chat2gpt(prompt, [assistant_limit, assistant_role, assistant_background, assistant_character])
+        answer = self.chat2gpt(cur_prompt, system, history_prompts, history_answers)
         history_prompts.append(cur_prompt)
         history_answers.append(answer)
 
         return answer, history_prompts, history_answers
+
+
+    def get_system_limit(self):
+        system_limit = '''
+        回答不要超过 512 个字和标点，
+        回答要自然简洁
+        '''
+        return system_limit
+
 
