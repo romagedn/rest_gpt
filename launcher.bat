@@ -1,5 +1,5 @@
-echo start repeating worker
+echo gpt
 echo off
 
-start .\venv\Scripts\python main.py
+.\venv\Scripts\python main.py
 
