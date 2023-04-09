@@ -1,5 +1,6 @@
 echo gpt
 echo off
 
-.\venv\Scripts\python main.py
+call .\venv\Scripts\python main.py
 
+pause

@@ -61,6 +61,10 @@ class Handler_updateChat(tornado.web.RequestHandler):
             "role": 'system',
             "content": system,
         })
+        messages.append({
+            "role": 'user',
+            "content": system,
+        })
 
         round = min(len(history_prompts), len(history_answers))
         start = max(0, round - 3)
@@ -118,8 +122,7 @@ class Handler_updateChat(tornado.web.RequestHandler):
 
     def get_system_limit(self):
         system_limit = '''
-        回答不要超过 512 个字和标点，
-        回答要自然简洁
+        你的回答不能超过 512 个字符.
         '''
         return system_limit
 
